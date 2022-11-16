@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-contract qtSwap {
+contract Arblet {
     // TODO: make a function to set the interest rate
     bool public reentracyGuard;
     uint256 public constant FEE = 3 * 10 ** 15; //0.3%

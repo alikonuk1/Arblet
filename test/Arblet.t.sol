@@ -2,10 +2,10 @@
 pragma solidity 0.8.15;
 
 import "forge-std/Test.sol";
-import {qtSwap} from "../src/qtSwap.sol";
+import {Arblet} from "../src/Arblet.sol";
 
-contract qtSwapTest is Test {
-    qtSwap qt;
+contract ArbletTest is Test {
+    Arblet arb;
 
     address creator = address(1);
     address borrower1 = address(2);
@@ -18,7 +18,7 @@ contract qtSwapTest is Test {
 
     function setUp() public {
         vm.startPrank(creator);
-        qt = new qtSwap();
+        arb = new Arblet();
         vm.stopPrank();
 
         //top up accounts with ether
@@ -33,16 +33,16 @@ contract qtSwapTest is Test {
 
     function testSuccess_provideLiquidity() public {
         vm.startPrank(provider1);
-        qt.provideLiquidity{value: 1 ether}();
+        arb.provideLiquidity{value: 1 ether}();
         vm.stopPrank();
 
-        assertEq(address(qt).balance, 1 ether);
+        assertEq(address(arb).balance, 1 ether);
 
         vm.startPrank(provider2);
-        qt.provideLiquidity{value: 3 ether}();
+        arb.provideLiquidity{value: 3 ether}();
         vm.stopPrank();
 
-        assertEq(address(qt).balance, 4 ether);
+        assertEq(address(arb).balance, 4 ether);
     }
 
     function testRevert_provideLiquidity_MoreThanBalance(uint256 amount) public {
@@ -51,17 +51,17 @@ contract qtSwapTest is Test {
         vm.startPrank(provider1);
 
         vm.expectRevert();
-        qt.provideLiquidity{value: amount}();
+        arb.provideLiquidity{value: amount}();
         vm.stopPrank();
     }
 
     function testSuccess_withdrawLiquidity() public {
         vm.startPrank(provider1);
-        qt.provideLiquidity{value: 1 ether}();
+        arb.provideLiquidity{value: 1 ether}();
         vm.stopPrank();
 
         vm.startPrank(provider1);
-        qt.withdrawLiquidity(1 ether);
+        arb.withdrawLiquidity(1 ether);
         vm.stopPrank();
     }
 
@@ -69,44 +69,44 @@ contract qtSwapTest is Test {
         vm.assume(amount > 1 ether);
 
         vm.startPrank(provider1);
-        qt.provideLiquidity{value: 1 ether}();
+        arb.provideLiquidity{value: 1 ether}();
         vm.stopPrank();
 
         vm.startPrank(provider1);
         vm.expectRevert("insufficient user balance");
-        qt.withdrawLiquidity(amount);
+        arb.withdrawLiquidity(amount);
         vm.stopPrank();
     }
 
     function testRevert_withdrawLiquidity_Hacker() public {
         vm.startPrank(provider1);
-        qt.provideLiquidity{value: 1 ether}();
+        arb.provideLiquidity{value: 1 ether}();
         vm.stopPrank();
 
         vm.startPrank(hacker);
         vm.expectRevert("insufficient user balance");
-        qt.withdrawLiquidity(1 ether);
+        arb.withdrawLiquidity(1 ether);
         vm.stopPrank();
     }
 
      function testSuccess_currentLiquidity() public {
         vm.startPrank(provider1);
-        qt.provideLiquidity{value: 3 ether}();
+        arb.provideLiquidity{value: 3 ether}();
         vm.stopPrank();
 
-        assertEq(qt.currentLiquidity(), 3 ether);
+        assertEq(arb.currentLiquidity(), 3 ether);
 
         vm.startPrank(provider2);
-        qt.provideLiquidity{value: 6 ether}();
+        arb.provideLiquidity{value: 6 ether}();
         vm.stopPrank();
 
-        assertEq(qt.currentLiquidity(), 9 ether);
+        assertEq(arb.currentLiquidity(), 9 ether);
 
         vm.startPrank(provider3);
-        qt.provideLiquidity{value: 9 ether}();
+        arb.provideLiquidity{value: 9 ether}();
         vm.stopPrank();
 
-        assertEq(qt.currentLiquidity(), 18 ether);
+        assertEq(arb.currentLiquidity(), 18 ether);
     }
 
     function testSuccess_calculateInterest(uint256 amount) public {
@@ -118,7 +118,7 @@ contract qtSwapTest is Test {
         uint256 interestRate = 3 * 10 ** 15; // 0.3%
 
         uint256 expectedInterest = amount * interestRate;
-        uint256 actualInterest = qt.calculateInterest(amount);
+        uint256 actualInterest = arb.calculateInterest(amount);
 
         assertEq(actualInterest, expectedInterest);
     }
