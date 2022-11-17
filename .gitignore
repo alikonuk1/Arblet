@@ -1,11 +1,23 @@
 # Compiler files
 cache/
 out/
+build/*
+node_modules
 
 # Ignores development broadcast logs
+broadcast/
 !/broadcast
 /broadcast/*/31337/
 /broadcast/**/dry-run/
 
 # Dotenv file
 .env
+
+# JetBrains
+.idea
+
+# Vscode
+.vscode
+
+# OS generated
+.DS_STORE
