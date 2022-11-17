@@ -112,8 +112,6 @@ contract ArbletTest is Test {
     function testSuccess_calculateInterest(uint256 amount) public {
         vm.assume(amount > 0);
         vm.assume(amount < 3 * 10**61);
-        //vm.assume(interestRate <= 10 ** 16); // 1%
-        //vm.assume(interestRate >= 10 ** 15); // 0.1%
 
         uint256 interestRate = 3 * 10 ** 15; // 0.3%
 
