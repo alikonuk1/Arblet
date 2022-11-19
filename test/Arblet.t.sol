@@ -4,8 +4,11 @@ pragma solidity 0.8.15;
 import "forge-std/Test.sol";
 import {Arblet} from "../src/Arblet.sol";
 
+import {Searcher} from "./mock/Searcher.sol";
+
 contract ArbletTest is Test {
     Arblet arb;
+    Searcher searcher;
 
     address creator = address(1);
     address borrower1 = address(2);
@@ -120,4 +123,27 @@ contract ArbletTest is Test {
 
         assertEq(actualInterest, expectedInterest);
     }
+
+    function testSuccess_excArb() public {
+        vm.startPrank(provider1);
+        arb.provideLiquidity{value: 33 ether}();
+        vm.stopPrank();
+
+        vm.startPrank(hacker);
+        searcher = new Searcher();
+        vm.deal(address(searcher), 999 ether);
+        searcher.setArblet(address(arb));
+        uint256 amount_ = arb.currentLiquidity();
+        searcher.exc(amount_);
+        vm.stopPrank();
+
+        uint256 interestRate = 3 * 10 ** 15; // 0.3%
+
+        uint256 expectedAmount = 33 ether * interestRate;
+        uint256 actualAmount = arb.currentLiquidity();
+
+        assertEq(expectedAmount, actualAmount);
+
+    }
+
 }

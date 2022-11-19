@@ -46,7 +46,7 @@ contract Arblet {
         emit LiquidityAdded(msg.sender, msg.value, sharesMinted);
     }
 
-    //withdraw a portion of liquidtiy by burning shares owned
+    //withdraw a portion of liquidity by burning shares owned
     function withdrawLiquidity(uint256 _shareAmount) external borrowLock {
         require(_shareAmount > 0, "non-zero value required");
         require(_shareAmount <= providerShares[msg.sender], "insufficient user balance");
@@ -76,7 +76,7 @@ contract Arblet {
         uint256 initialLiquidity = address(this).balance;
         uint256 interest = calculateInterest(_ethAmount);
         uint256 outstandingDebt = _ethAmount + interest;
-        //global mutex activated, pauding all functions except repayDebt()
+        //global mutex activated, pausing all functions except repayDebt()
         reentracyGuard = true;
         //debt recoreded in storage (but gas will be partially refunded when it's zeroed out)
         borrowerDebt[msg.sender] = outstandingDebt;
