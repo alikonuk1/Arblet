@@ -4,7 +4,8 @@ pragma solidity 0.8.15;
 contract Arblet {
     // TODO: make a function to set the interest rate
     bool public reentracyGuard;
-    uint256 public constant FEE = 3 * 10 ** 15; //0.3%
+    uint256 public constant providerFee = 2 * 10 ** 15; //0.2%
+    uint256 public constant protocolFee = 1 * 10 ** 15; //0.1%
     uint256 public shareSupply;
 
     mapping(address => uint256) public providerShares;
@@ -47,35 +48,36 @@ contract Arblet {
     }
 
     //withdraw a portion of liquidity by burning shares owned
-    function withdrawLiquidity(uint256 _shareAmount) external borrowLock {
-        require(_shareAmount > 0, "non-zero value required");
-        require(_shareAmount <= providerShares[msg.sender], "insufficient user balance");
-        require(_shareAmount <= shareSupply, "insufficient global supply");
+    function withdrawLiquidity(uint256 shareAmount) external borrowLock {
+        require(shareAmount > 0, "non-zero value required");
+        require(shareAmount <= providerShares[msg.sender], "insufficient user balance");
+        require(shareAmount <= shareSupply, "insufficient global supply");
 
         //percentage and value of shares calcuated
-        uint256 shareProportion = sharesAsPercentage(_shareAmount);
+        uint256 shareProportion = sharesAsPercentage(shareAmount);
         uint256 shareValue = shareValue_(shareProportion);
         //share balances updated in storage
-        providerShares[msg.sender] = providerShares[msg.sender] - _shareAmount;
-        shareSupply = shareSupply - _shareAmount;
+        providerShares[msg.sender] = providerShares[msg.sender] - shareAmount;
+        shareSupply = shareSupply - shareAmount;
         //ether returned to user
         //msg.sender.transfer(shareValue);
         (bool sent,) = msg.sender.call{value: shareValue}("");
         require(sent, "Failed to send Ether");
 
-        emit LiquidityRemoved(msg.sender, shareValue, _shareAmount);
+        emit LiquidityRemoved(msg.sender, shareValue, shareAmount);
     }
 
     //issue a new loan
-    function borrow(uint256 _ethAmount) external borrowLock {
-        require(_ethAmount >= 1 wei, "non-dust value required");
-        require(_ethAmount <= address(this).balance, "insufficient global liquidity");
+    function borrow(uint256 ethAmount) external borrowLock {
+        require(ethAmount >= 1 wei, "non-dust value required");
+        require(ethAmount <= address(this).balance, "insufficient global liquidity");
         //@dev this should really be unreachable given the modifier
         require(borrowerDebt[msg.sender] == 0, "active loan in progress");
         //current balance recored and debt calculated
         uint256 initialLiquidity = address(this).balance;
-        uint256 interest = calculateInterest(_ethAmount);
-        uint256 outstandingDebt = _ethAmount + interest;
+        uint256 providerInterest = calculateInterest(ethAmount);
+        uint256 protocolInterest = calculateProtocolInterest(ethAmount);
+        uint256 outstandingDebt = ethAmount + providerInterest + protocolInterest;
         //global mutex activated, pausing all functions except repayDebt()
         reentracyGuard = true;
         //debt recoreded in storage (but gas will be partially refunded when it's zeroed out)
@@ -83,13 +85,13 @@ contract Arblet {
         //requested funds sent to user via raw call with empty data
         //additional gas withheld to ensure the completion of this function
         //data is ignored
-        bool result;
-        (result,) = msg.sender.call{gas: (gasleft() - 10000), value: _ethAmount}("");
+        bool result0;
+        (result0,) = msg.sender.call{gas: (gasleft() - 10000), value: ethAmount}("");
         //borrower can now execute actions triggered by a fallback function in their contract
         //they need to call repayDebt() and return the funds before this function continues
-        require(result, "the call must return true");
+        require(result0, "the call must return true");
         //will revert full tx if loan is not repaid
-        require(address(this).balance >= (initialLiquidity + interest), "funds must be returned plus interest");
+        require(address(this).balance >= (initialLiquidity + providerInterest + protocolInterest), "funds must be returned plus interest");
         // prevents mutex being locked via ether forced into contract rather than via repayDebt()
         require(borrowerDebt[msg.sender] == 0, "borrower debt must be repaid in full");
         //mutex disabled
@@ -99,50 +101,54 @@ contract Arblet {
     }
 
     //debt can be repaid from another address than the original borrower
-    function repayDebt(address _borrower) public payable {
+    function repayDebt(address borrower) public payable {
         require(reentracyGuard == true, "can only repay active loans");
-        require(borrowerDebt[_borrower] != 0, "must repay outstanding debt");
-        require(msg.value == borrowerDebt[_borrower], "debt must be repaid in full");
+        require(borrowerDebt[borrower] != 0, "must repay outstanding debt");
+        require(msg.value == borrowerDebt[borrower], "debt must be repaid in full");
 
-        uint256 outstandingDebt = borrowerDebt[_borrower];
-        borrowerDebt[_borrower] = 0;
+        uint256 outstandingDebt = borrowerDebt[borrower];
+        borrowerDebt[borrower] = 0;
 
-        emit LoanRepayed(_borrower, msg.sender, outstandingDebt);
+        emit LoanRepayed(borrower, msg.sender, outstandingDebt);
     }
 
     /**
      * VIEW FUNCTIONS
      */
 
-    function sharesAsPercentage(uint256 _shareAmount) public view returns (uint256 _sharePercentage) {
-        _sharePercentage = _shareAmount / shareSupply;
+    function sharesAsPercentage(uint256 shareAmount) public view returns (uint256 sharePercentage) {
+        sharePercentage = shareAmount / shareSupply;
     }
 
-    function shareValue_(uint256 _shareAmount) public view returns (uint256 _value) {
-        _value = address(this).balance / _shareAmount;
+    function shareValue_(uint256 shareAmount) public view returns (uint256 value) {
+        value = address(this).balance / shareAmount;
     }
 
-    function liquidityAsPercentage(uint256 _newLiquidity) public view returns (uint256 _liquidityPercentage) {
-        _liquidityPercentage = (10**18 * _newLiquidity) / address(this).balance;
+    function liquidityAsPercentage(uint256 newLiquidity) public view returns (uint256 liquidityPercentage) {
+        liquidityPercentage = (10**18 * newLiquidity) / address(this).balance;
     }
 
-    function sharesAfterDeposit(uint256 _liquidityProportion) public view returns (uint256 _shares) {
+    function sharesAfterDeposit(uint256 liquidityProportion) public view returns (uint256 shares) {
         uint256 newShareSupply;
 
-        if (shareSupply == 0 || 10**18 == _liquidityProportion) {
+        if (shareSupply == 0 || 10**18 == liquidityProportion) {
             newShareSupply = 10**18;
         } else {
-            newShareSupply = (10**18 * shareSupply) / _liquidityProportion;
+            newShareSupply = (10**18 * shareSupply) / liquidityProportion;
         }
 
-        _shares = newShareSupply - shareSupply;
+        shares = newShareSupply - shareSupply;
     }
 
-    function calculateInterest(uint256 _loanAmount) public pure returns (uint256 _interest) {
-        _interest = _loanAmount * FEE;
+    function calculateInterest(uint256 loanAmount) public pure returns (uint256 interest) {
+        interest = (loanAmount * providerFee) / 10 ** 18;
     }
 
-    function currentLiquidity() external view returns (uint256 _avialableLiquidity) {
-        _avialableLiquidity = address(this).balance;
+    function calculateProtocolInterest(uint256 loanAmount) public pure returns (uint256 protocolInterest) {
+        protocolInterest = (loanAmount * protocolFee) / 10 ** 18;
+    }
+
+    function currentLiquidity() external view returns (uint256 avialableLiquidity) {
+        avialableLiquidity = address(this).balance;
     }
 }

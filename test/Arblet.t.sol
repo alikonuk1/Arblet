@@ -114,11 +114,11 @@ contract ArbletTest is Test {
 
     function testSuccess_calculateInterest(uint256 amount) public {
         vm.assume(amount > 0);
-        vm.assume(amount < 3 * 10**61);
+        vm.assume(amount < 2 * 10**61);
 
-        uint256 interestRate = 3 * 10 ** 15; // 0.3%
+        uint256 interestRate = 2 * 10 ** 15; // 0.2%
 
-        uint256 expectedInterest = amount * interestRate;
+        uint256 expectedInterest = (amount * interestRate) / 10 ** 18;
         uint256 actualInterest = arb.calculateInterest(amount);
 
         assertEq(actualInterest, expectedInterest);
@@ -137,9 +137,10 @@ contract ArbletTest is Test {
         searcher.exc(amount_);
         vm.stopPrank();
 
-        uint256 interestRate = 3 * 10 ** 15; // 0.3%
+        uint256 providerRate = 2 * 10 ** 15; // 0.2%
+        uint256 protocolRate = 1 * 10 ** 15; // 0.2%
 
-        uint256 expectedAmount = 33 ether * interestRate;
+        uint256 expectedAmount = amount_ + (33 ether * (providerRate + protocolRate)) / 10 ** 18;
         uint256 actualAmount = arb.currentLiquidity();
 
         assertEq(expectedAmount, actualAmount);
