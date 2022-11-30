@@ -18,10 +18,12 @@ contract ArbletTest is Test {
     address provider2 = address(6);
     address provider3 = address(7);
     address hacker = address(9);
+    address protocol = address(32);
 
     function setUp() public {
         vm.startPrank(creator);
         arb = new Arblet();
+        arb.setProtocol(address(protocol));
         vm.stopPrank();
 
         //top up accounts with ether
@@ -140,11 +142,74 @@ contract ArbletTest is Test {
         uint256 providerRate = 2 * 10 ** 15; // 0.2%
         uint256 protocolRate = 1 * 10 ** 15; // 0.2%
 
-        uint256 expectedAmount = amount_ + (33 ether * (providerRate + protocolRate)) / 10 ** 18;
+        uint256 expectedAmount = amount_ + (33 ether * (providerRate )) / 10 ** 18;
         uint256 actualAmount = arb.currentLiquidity();
 
         assertEq(expectedAmount, actualAmount);
 
+        uint256 expectedBalance = address(protocol).balance;
+        uint256 actualBalance = (33 ether * protocolRate) / 10 ** 18;
+
+        assertEq(expectedBalance, actualBalance);
     }
 
+    function testSuccess_endToEnd() public {
+        vm.startPrank(provider1);
+        arb.provideLiquidity{value: 3 ether}();
+        vm.stopPrank();
+
+        assertEq(arb.currentLiquidity(), 3 ether);
+
+        vm.startPrank(provider2);
+        arb.provideLiquidity{value: 6 ether}();
+        vm.stopPrank();
+
+        assertEq(arb.currentLiquidity(), 9 ether);
+
+        vm.startPrank(provider3);
+        arb.provideLiquidity{value: 9 ether}();
+        vm.stopPrank();
+
+        assertEq(arb.currentLiquidity(), 18 ether);
+
+        vm.startPrank(hacker);
+        searcher = new Searcher();
+        vm.deal(address(searcher), 999 ether);
+        searcher.setArblet(address(arb));
+        uint256 amount_ = arb.currentLiquidity();
+        searcher.exc(amount_);
+        vm.stopPrank();
+
+        uint256 providerRate = 2 * 10 ** 15; // 0.2%
+        uint256 protocolRate = 1 * 10 ** 15; // 0.1%
+
+        uint256 expectedAmount = amount_ + (18 ether * (providerRate )) / 10 ** 18;
+        uint256 actualAmount = arb.currentLiquidity();
+
+        assertEq(expectedAmount, actualAmount);
+
+        uint256 expectedBalance = address(protocol).balance;
+        uint256 actualBalance = (18 ether * protocolRate) / 10 ** 18;
+
+        assertEq(expectedBalance, actualBalance);
+
+        uint256 log = arb.getShares(address(provider1));
+
+        emit log_uint(log);
+
+        emit log_string("yo");
+        emit log_uint(address(provider1).balance);
+        //provider1 withdraw 1/3 of the funds
+        vm.startPrank(provider1);
+        arb.withdrawLiquidity(500000000000000000);
+
+        emit log_string("yo");
+        emit log_uint(address(provider1).balance);
+
+        arb.withdrawLiquidity(500000000000000000);
+
+        emit log_string("yo");
+        emit log_uint(address(provider1).balance);
+        vm.stopPrank();
+    }
 }

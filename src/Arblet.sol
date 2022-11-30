@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-contract Arblet {
+import {Ownable} from "./utils/Ownable.sol";
+
+contract Arblet is Ownable{
     // TODO: make a function to set the interest rate
     bool public reentracyGuard;
     uint256 public constant providerFee = 2 * 10 ** 15; //0.2%
     uint256 public constant protocolFee = 1 * 10 ** 15; //0.1%
     uint256 public shareSupply;
+    address public protocol;
 
     mapping(address => uint256) public providerShares;
     mapping(address => uint256) public borrowerDebt;
@@ -94,6 +97,10 @@ contract Arblet {
         require(address(this).balance >= (initialLiquidity + providerInterest + protocolInterest), "funds must be returned plus interest");
         // prevents mutex being locked via ether forced into contract rather than via repayDebt()
         require(borrowerDebt[msg.sender] == 0, "borrower debt must be repaid in full");
+        (bool result1,) = protocol.call{gas: (gasleft() - 10000), value: protocolInterest}("");
+        //borrower can now execute actions triggered by a fallback function in their contract
+        //they need to call repayDebt() and return the funds before this function continues
+        require(result1, "the call must return true");
         //mutex disabled
         reentracyGuard = false;
 
@@ -117,7 +124,7 @@ contract Arblet {
      */
 
     function sharesAsPercentage(uint256 shareAmount) public view returns (uint256 sharePercentage) {
-        sharePercentage = shareAmount / shareSupply;
+        sharePercentage = (shareAmount * 10) / shareSupply;
     }
 
     function shareValue_(uint256 shareAmount) public view returns (uint256 value) {
@@ -150,5 +157,13 @@ contract Arblet {
 
     function currentLiquidity() external view returns (uint256 avialableLiquidity) {
         avialableLiquidity = address(this).balance;
+    }
+
+    function setProtocol(address protocol_) public onlyOwner {
+        protocol = protocol_;
+    }
+
+    function  getShares(address provider) public returns(uint256){
+        return (providerShares[provider]);
     }
 }
