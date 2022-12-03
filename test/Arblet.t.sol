@@ -94,7 +94,7 @@ contract ArbletTest is Test {
         vm.stopPrank();
     }
 
-     function testSuccess_currentLiquidity() public {
+    function testSuccess_currentLiquidity() public {
         vm.startPrank(provider1);
         arb.provideLiquidity{value: 3 ether}();
         vm.stopPrank();
@@ -116,7 +116,7 @@ contract ArbletTest is Test {
 
     function testSuccess_calculateInterest(uint256 amount) public {
         vm.assume(amount > 0);
-        vm.assume(amount < 2 * 10**61);
+        vm.assume(amount < 2 * 10 ** 61);
 
         uint256 interestRate = 2 * 10 ** 15; // 0.2%
 
@@ -142,7 +142,7 @@ contract ArbletTest is Test {
         uint256 providerRate = 2 * 10 ** 15; // 0.2%
         uint256 protocolRate = 1 * 10 ** 15; // 0.2%
 
-        uint256 expectedAmount = amount_ + (33 ether * (providerRate )) / 10 ** 18;
+        uint256 expectedAmount = amount_ + (33 ether * (providerRate)) / 10 ** 18;
         uint256 actualAmount = arb.currentLiquidity();
 
         assertEq(expectedAmount, actualAmount);
@@ -183,7 +183,7 @@ contract ArbletTest is Test {
         uint256 providerRate = 2 * 10 ** 15; // 0.2%
         uint256 protocolRate = 1 * 10 ** 15; // 0.1%
 
-        uint256 expectedAmount = amount_ + (18 ether * (providerRate )) / 10 ** 18;
+        uint256 expectedAmount = amount_ + (18 ether * (providerRate)) / 10 ** 18;
         uint256 actualAmount = arb.currentLiquidity();
 
         assertEq(expectedAmount, actualAmount);
@@ -193,23 +193,35 @@ contract ArbletTest is Test {
 
         assertEq(expectedBalance, actualBalance);
 
-        uint256 log = arb.getShares(address(provider1));
-
-        emit log_uint(log);
-
-        emit log_string("yo");
-        emit log_uint(address(provider1).balance);
-        //provider1 withdraw 1/3 of the funds
         vm.startPrank(provider1);
-        arb.withdrawLiquidity(500000000000000000);
-
-        emit log_string("yo");
-        emit log_uint(address(provider1).balance);
-
-        arb.withdrawLiquidity(500000000000000000);
-
-        emit log_string("yo");
-        emit log_uint(address(provider1).balance);
+        uint256 shares1 = arb.getShares(provider1);
+        arb.withdrawLiquidity(shares1);
         vm.stopPrank();
+
+/*         uint256 expectedInterest = 3 ether + ((3 ether * 2 * 10 ** 15) / 10 ** 18);
+        uint256 actualInterest = address(provider1).balance - 999 ether;
+
+        assertEq(expectedInterest, actualInterest); */
+
+        vm.startPrank(provider2);
+        uint256 shares2 = arb.getShares(provider2);
+        arb.withdrawLiquidity(shares2);
+        vm.stopPrank();
+
+        vm.startPrank(provider3);
+        uint256 shares3 = arb.getShares(provider3);
+        arb.withdrawLiquidity(shares3);
+        vm.stopPrank();
+
+        emit log_string("p1");
+        emit log_uint(address(provider1).balance);
+        emit log_string("p2");
+        emit log_uint(address(provider2).balance);
+        emit log_string("p3");
+        emit log_uint(address(provider3).balance);
+        emit log_string("p");
+        emit log_uint(address(protocol).balance);
+        emit log_string("c");
+        emit log_uint(address(arb).balance);
     }
 }

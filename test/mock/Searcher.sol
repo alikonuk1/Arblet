@@ -9,7 +9,6 @@ interface IArblet {
 }
 
 contract Searcher {
-
     address public arblet;
     uint256 public amount;
 
@@ -20,6 +19,7 @@ contract Searcher {
 
         arb.repayDebt{gas: (gasleft() - 10000), value: amount_}(address(this));
     }
+
     fallback() external payable {
         //repay(address(this), amount);
     }

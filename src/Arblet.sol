@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import {Ownable} from "./utils/Ownable.sol";
 
-contract Arblet is Ownable{
+contract Arblet is Ownable {
     // TODO: make a function to set the interest rate
     bool public reentracyGuard;
     uint256 public constant providerFee = 2 * 10 ** 15; //0.2%
@@ -94,7 +94,10 @@ contract Arblet is Ownable{
         //they need to call repayDebt() and return the funds before this function continues
         require(result0, "the call must return true");
         //will revert full tx if loan is not repaid
-        require(address(this).balance >= (initialLiquidity + providerInterest + protocolInterest), "funds must be returned plus interest");
+        require(
+            address(this).balance >= (initialLiquidity + providerInterest + protocolInterest),
+            "funds must be returned plus interest"
+        );
         // prevents mutex being locked via ether forced into contract rather than via repayDebt()
         require(borrowerDebt[msg.sender] == 0, "borrower debt must be repaid in full");
         (bool result1,) = protocol.call{gas: (gasleft() - 10000), value: protocolInterest}("");
@@ -132,16 +135,16 @@ contract Arblet is Ownable{
     }
 
     function liquidityAsPercentage(uint256 newLiquidity) public view returns (uint256 liquidityPercentage) {
-        liquidityPercentage = (10**18 * newLiquidity) / address(this).balance;
+        liquidityPercentage = (10 ** 18 * newLiquidity) / address(this).balance;
     }
 
     function sharesAfterDeposit(uint256 liquidityProportion) public view returns (uint256 shares) {
         uint256 newShareSupply;
 
-        if (shareSupply == 0 || 10**18 == liquidityProportion) {
-            newShareSupply = 10**18;
+        if (shareSupply == 0 || 10 ** 18 == liquidityProportion) {
+            newShareSupply = 10 ** 18;
         } else {
-            newShareSupply = (10**18 * shareSupply) / liquidityProportion;
+            newShareSupply = (10 ** 18 * shareSupply) / liquidityProportion;
         }
 
         shares = newShareSupply - shareSupply;
@@ -163,7 +166,7 @@ contract Arblet is Ownable{
         protocol = protocol_;
     }
 
-    function  getShares(address provider) public returns(uint256){
+    function getShares(address provider) public view returns (uint256) {
         return (providerShares[provider]);
     }
 }
