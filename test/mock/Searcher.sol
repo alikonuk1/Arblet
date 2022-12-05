@@ -15,7 +15,7 @@ contract Searcher {
     receive() external payable {
         IArblet arb = IArblet(arblet);
 
-        uint256 amount_ = arb.calculateInterest(amount) + amount + arb.calculateProtocolInterest(amount);
+        uint256 amount_ = arb.calculateInterest(amount) + amount;
 
         arb.repayDebt{gas: (gasleft() - 10000), value: amount_}(address(this));
     }

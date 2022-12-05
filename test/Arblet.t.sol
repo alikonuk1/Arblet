@@ -5,8 +5,9 @@ import "forge-std/Test.sol";
 import {Arblet} from "../src/Arblet.sol";
 
 import {Searcher} from "./mock/Searcher.sol";
+import {DSMath} from "../src/utils/DSMath.sol";
 
-contract ArbletTest is Test {
+contract ArbletTest is Test, DSMath {
     Arblet arb;
     Searcher searcher;
 
@@ -115,12 +116,12 @@ contract ArbletTest is Test {
     }
 
     function testSuccess_calculateInterest(uint256 amount) public {
-        vm.assume(amount > 0);
-        vm.assume(amount < 2 * 10 ** 61);
+        vm.assume(amount > 100000);
+        vm.assume(amount < 3 * 10 ** 61);
 
-        uint256 interestRate = 2 * 10 ** 15; // 0.2%
+        uint256 interestRate = 3 * 10 ** 15; // 0.3%
 
-        uint256 expectedInterest = (amount * interestRate) / 10 ** 18;
+        uint256 expectedInterest = wmul(amount, interestRate);
         uint256 actualInterest = arb.calculateInterest(amount);
 
         assertEq(actualInterest, expectedInterest);
@@ -139,8 +140,8 @@ contract ArbletTest is Test {
         searcher.exc(amount_);
         vm.stopPrank();
 
-        uint256 providerRate = 2 * 10 ** 15; // 0.2%
-        uint256 protocolRate = 1 * 10 ** 15; // 0.2%
+        uint256 providerRate = 2 * 10 ** 15; // 0.3%
+        uint256 protocolRate = 1 * 10 ** 15; // 0.1%
 
         uint256 expectedAmount = amount_ + (33 ether * (providerRate)) / 10 ** 18;
         uint256 actualAmount = arb.currentLiquidity();
@@ -172,6 +173,9 @@ contract ArbletTest is Test {
 
         assertEq(arb.currentLiquidity(), 18 ether);
 
+        emit log_string("c");
+        emit log_uint(address(arb).balance);
+
         vm.startPrank(hacker);
         searcher = new Searcher();
         vm.deal(address(searcher), 999 ether);
@@ -193,6 +197,16 @@ contract ArbletTest is Test {
 
         assertEq(expectedBalance, actualBalance);
 
+        emit log_string("c");
+        emit log_uint(address(arb).balance);
+
+        emit log_string("p1");
+        emit log_uint(address(provider1).balance);
+        emit log_string("p2");
+        emit log_uint(address(provider2).balance);
+        emit log_string("p3");
+        emit log_uint(address(provider3).balance);
+
         vm.startPrank(provider1);
         uint256 shares1 = arb.getShares(provider1);
         arb.withdrawLiquidity(shares1);
@@ -203,10 +217,16 @@ contract ArbletTest is Test {
 
         assertEq(expectedInterest, actualInterest); */
 
+        emit log_string("c");
+        emit log_uint(address(arb).balance);
+
         vm.startPrank(provider2);
         uint256 shares2 = arb.getShares(provider2);
         arb.withdrawLiquidity(shares2);
         vm.stopPrank();
+
+        emit log_string("c");
+        emit log_uint(address(arb).balance);
 
         vm.startPrank(provider3);
         uint256 shares3 = arb.getShares(provider3);

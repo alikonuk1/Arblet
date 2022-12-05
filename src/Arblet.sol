@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import {DSMath} from "./utils/DSMath.sol";
 import {Ownable} from "./utils/Ownable.sol";
 
-contract Arblet is Ownable {
+contract Arblet is Ownable, DSMath {
     // TODO: make a function to set the interest rate
     bool public reentracyGuard;
-    uint256 public constant providerFee = 2 * 10 ** 15; //0.2%
+    uint256 public constant providerFee = 3 * 10 ** 15; //0.2%
     uint256 public constant protocolFee = 1 * 10 ** 15; //0.1%
     uint256 public shareSupply;
     address public protocol;
@@ -80,7 +81,7 @@ contract Arblet is Ownable {
         uint256 initialLiquidity = address(this).balance;
         uint256 providerInterest = calculateInterest(ethAmount);
         uint256 protocolInterest = calculateProtocolInterest(ethAmount);
-        uint256 outstandingDebt = ethAmount + providerInterest + protocolInterest;
+        uint256 outstandingDebt = ethAmount + providerInterest;
         //global mutex activated, pausing all functions except repayDebt()
         reentracyGuard = true;
         //debt recoreded in storage (but gas will be partially refunded when it's zeroed out)
@@ -95,7 +96,7 @@ contract Arblet is Ownable {
         require(result0, "the call must return true");
         //will revert full tx if loan is not repaid
         require(
-            address(this).balance >= (initialLiquidity + providerInterest + protocolInterest),
+            address(this).balance >= (initialLiquidity + providerInterest),
             "funds must be returned plus interest"
         );
         // prevents mutex being locked via ether forced into contract rather than via repayDebt()
@@ -127,7 +128,7 @@ contract Arblet is Ownable {
      */
 
     function sharesAsPercentage(uint256 shareAmount) public view returns (uint256 sharePercentage) {
-        sharePercentage = (shareAmount * 10) / shareSupply;
+        sharePercentage = shareAmount * 10 / shareSupply;
     }
 
     function shareValue_(uint256 shareAmount) public view returns (uint256 value) {
