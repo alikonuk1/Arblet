@@ -13,6 +13,7 @@ broadcast/
 # Dotenv file
 .env
 
+
 # JetBrains
 .idea
 
