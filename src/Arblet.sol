@@ -1,14 +1,12 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import {DSMath} from "./utils/DSMath.sol";
 import {Ownable} from "./utils/Ownable.sol";
 
-contract Arblet is Ownable, DSMath {
-    // TODO: make a function to set the interest rate
-    bool public reentracyGuard;
-    uint256 public constant providerFee = 3 * 10 ** 15; //0.2%
-    uint256 public constant protocolFee = 1 * 10 ** 15; //0.1%
+contract Arblet is Ownable {
+    bool public borrowLocked;
+    uint256 public constant fee = 3 * 10 ** 15; // 3000000000000000 = 0.3%
+    uint256 public constant protocolFee = 1 * 10 ** 15; // 1000000000000000 = 0.1%
     uint256 public shareSupply;
     address public protocol;
 
@@ -16,7 +14,7 @@ contract Arblet is Ownable, DSMath {
     mapping(address => uint256) public borrowerDebt;
 
     modifier borrowLock() {
-        require(!reentracyGuard, "functions locked during active loan");
+        require(!borrowLocked, "Functions locked during a loan");
         _;
     }
 
@@ -31,20 +29,18 @@ contract Arblet is Ownable, DSMath {
     // Function to receive Ether. msg.data must be empty
     receive() external payable {}
 
-    //auto repay debt from msg.sender
+    // Auto repay debt from msg.sender
     fallback() external payable {
-        //shortcut for raw calls to repay debt
+        // Shortcut for raw calls to repay debt
         repayDebt(msg.sender);
     }
 
-    //add ether liquidity and receive newly minted shares
+    // Add ether liquidity and receive newly minted shares
     function provideLiquidity() external payable borrowLock {
-        require(msg.value > 1 wei, "non-dust value required");
-        //new liquidity as a percentage of total liquidity
-        uint256 liquidityProportion = liquidityAsPercentage(msg.value);
-        //new shares minted to the same ratio
-        uint256 sharesMinted = sharesAfterDeposit(liquidityProportion);
-        //share balances updated in storage
+        require(msg.value > 1 wei, "Non-dust value required");
+        // New shares minted to the same ratio
+        uint256 sharesMinted = msg.value;
+        // Share balances updated in storage
         providerShares[msg.sender] = providerShares[msg.sender] + sharesMinted;
         shareSupply = shareSupply + sharesMinted;
 
@@ -58,17 +54,17 @@ contract Arblet is Ownable, DSMath {
         require(shareAmount <= shareSupply, "insufficient global supply");
 
         //percentage and value of shares calcuated
-        uint256 shareProportion = sharesAsPercentage(shareAmount);
-        uint256 shareValue = shareValue_(shareProportion);
+        //uint256 shareProportion = liquidityAsPercentage(shareAmount);
+        //uint256 shareValue = shareValue_(shareAmount);
         //share balances updated in storage
         providerShares[msg.sender] = providerShares[msg.sender] - shareAmount;
         shareSupply = shareSupply - shareAmount;
         //ether returned to user
         //msg.sender.transfer(shareValue);
-        (bool sent,) = msg.sender.call{value: shareValue}("");
+        (bool sent,) = msg.sender.call{value: shareAmount}("");
         require(sent, "Failed to send Ether");
 
-        emit LiquidityRemoved(msg.sender, shareValue, shareAmount);
+        emit LiquidityRemoved(msg.sender, shareAmount, shareAmount);
     }
 
     //issue a new loan
@@ -79,24 +75,23 @@ contract Arblet is Ownable, DSMath {
         require(borrowerDebt[msg.sender] == 0, "active loan in progress");
         //current balance recored and debt calculated
         uint256 initialLiquidity = address(this).balance;
-        uint256 providerInterest = calculateInterest(ethAmount);
+        uint256 interest = calculateInterest(ethAmount);
         uint256 protocolInterest = calculateProtocolInterest(ethAmount);
-        uint256 outstandingDebt = ethAmount + providerInterest;
+        uint256 outstandingDebt = ethAmount + interest;
         //global mutex activated, pausing all functions except repayDebt()
-        reentracyGuard = true;
+        borrowLocked = true;
         //debt recoreded in storage (but gas will be partially refunded when it's zeroed out)
         borrowerDebt[msg.sender] = outstandingDebt;
         //requested funds sent to user via raw call with empty data
         //additional gas withheld to ensure the completion of this function
         //data is ignored
-        bool result0;
-        (result0,) = msg.sender.call{gas: (gasleft() - 10000), value: ethAmount}("");
+        (bool result0,) = msg.sender.call{gas: (gasleft() - 10000), value: ethAmount}("");
         //borrower can now execute actions triggered by a fallback function in their contract
         //they need to call repayDebt() and return the funds before this function continues
         require(result0, "the call must return true");
         //will revert full tx if loan is not repaid
         require(
-            address(this).balance >= (initialLiquidity + providerInterest),
+            address(this).balance >= (initialLiquidity + interest),
             "funds must be returned plus interest"
         );
         // prevents mutex being locked via ether forced into contract rather than via repayDebt()
@@ -106,14 +101,14 @@ contract Arblet is Ownable, DSMath {
         //they need to call repayDebt() and return the funds before this function continues
         require(result1, "the call must return true");
         //mutex disabled
-        reentracyGuard = false;
+        borrowLocked = false;
 
         emit LoanCompleted(msg.sender, outstandingDebt);
     }
 
     //debt can be repaid from another address than the original borrower
     function repayDebt(address borrower) public payable {
-        require(reentracyGuard == true, "can only repay active loans");
+        require(borrowLocked == true, "can only repay active loans");
         require(borrowerDebt[borrower] != 0, "must repay outstanding debt");
         require(msg.value == borrowerDebt[borrower], "debt must be repaid in full");
 
@@ -127,32 +122,27 @@ contract Arblet is Ownable, DSMath {
      * VIEW FUNCTIONS
      */
 
-    function sharesAsPercentage(uint256 shareAmount) public view returns (uint256 sharePercentage) {
-        sharePercentage = shareAmount * 10 / shareSupply;
-    }
-
-    function shareValue_(uint256 shareAmount) public view returns (uint256 value) {
-        value = address(this).balance / shareAmount;
-    }
-
-    function liquidityAsPercentage(uint256 newLiquidity) public view returns (uint256 liquidityPercentage) {
-        liquidityPercentage = (10 ** 18 * newLiquidity) / address(this).balance;
-    }
-
-    function sharesAfterDeposit(uint256 liquidityProportion) public view returns (uint256 shares) {
-        uint256 newShareSupply;
-
-        if (shareSupply == 0 || 10 ** 18 == liquidityProportion) {
-            newShareSupply = 10 ** 18;
+    // 1000000000000000000 = 100
+    // 
+    // 10000000000000000 = 1
+    // 
+    // 1000000000000000 = 0.1
+    function liquidityAsPercentage(uint256 addedLiquidity) public view returns(uint256 liquidityPercentage){
+        if(address(this).balance <= 0){
+            liquidityPercentage = 10 ** 18;
         } else {
-            newShareSupply = (10 ** 18 * shareSupply) / liquidityProportion;
+        uint256 liquidity = addedLiquidity + address(this).balance;
+        liquidityPercentage = (addedLiquidity * 10 ** 18 / liquidity);
         }
+    }
 
-        shares = newShareSupply - shareSupply;
+    function shareValue_(uint256 shareProportion) public view returns (uint256 value) {
+        uint256 interestValue = address(this).balance - shareSupply;
+        value = (interestValue * 10 ** 18) / shareProportion;
     }
 
     function calculateInterest(uint256 loanAmount) public pure returns (uint256 interest) {
-        interest = (loanAmount * providerFee) / 10 ** 18;
+        interest = (loanAmount * fee) / 10 ** 18;
     }
 
     function calculateProtocolInterest(uint256 loanAmount) public pure returns (uint256 protocolInterest) {

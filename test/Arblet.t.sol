@@ -5,9 +5,8 @@ import "forge-std/Test.sol";
 import {Arblet} from "../src/Arblet.sol";
 
 import {Searcher} from "./mock/Searcher.sol";
-import {DSMath} from "../src/utils/DSMath.sol";
 
-contract ArbletTest is Test, DSMath {
+contract ArbletTest is Test{
     Arblet arb;
     Searcher searcher;
 
@@ -121,7 +120,7 @@ contract ArbletTest is Test, DSMath {
 
         uint256 interestRate = 3 * 10 ** 15; // 0.3%
 
-        uint256 expectedInterest = wmul(amount, interestRate);
+        uint256 expectedInterest = (amount * interestRate) / 10 ** 18;
         uint256 actualInterest = arb.calculateInterest(amount);
 
         assertEq(actualInterest, expectedInterest);
