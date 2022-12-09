@@ -5,10 +5,11 @@ import {Ownable} from "./utils/Ownable.sol";
 
 contract Arblet is Ownable {
     bool public borrowLocked;
-    uint256 public constant fee = 3 * 10 ** 15; // 3000000000000000 = 0.3%
-    uint256 public constant protocolFee = 1 * 10 ** 15; // 1000000000000000 = 0.1%
+    uint256 public fee = 3 * 10 ** 15; // 3000000000000000 = 0.3%
+    uint256 public protocolFee = 1 * 10 ** 15; // 1000000000000000 = 0.1%
     uint256 public shareSupply;
     address public protocol;
+
 
     mapping(address => uint256) public providerShares;
     mapping(address => uint256) public borrowerDebt;
@@ -38,9 +39,7 @@ contract Arblet is Ownable {
     // Add ether liquidity and receive newly minted shares
     function provideLiquidity() external payable borrowLock {
         require(msg.value > 1 wei, "Non-dust value required");
-        // New shares minted to the same ratio
         uint256 sharesMinted = msg.value;
-        // Share balances updated in storage
         providerShares[msg.sender] = providerShares[msg.sender] + sharesMinted;
         shareSupply = shareSupply + sharesMinted;
 
@@ -48,59 +47,60 @@ contract Arblet is Ownable {
     }
 
     //withdraw a portion of liquidity by burning shares owned
-    function withdrawLiquidity(uint256 shareAmount) external borrowLock {
+    function withdrawLiquidity(uint256 shareAmount) external borrowLock{
         require(shareAmount > 0, "non-zero value required");
         require(shareAmount <= providerShares[msg.sender], "insufficient user balance");
         require(shareAmount <= shareSupply, "insufficient global supply");
 
-        //percentage and value of shares calcuated
-        //uint256 shareProportion = liquidityAsPercentage(shareAmount);
-        //uint256 shareValue = shareValue_(shareAmount);
+        uint256 sharePer = (address(this).balance * 10**18 / shareSupply);
+        uint256 shareValue = (sharePer * (shareAmount)) / 10**18;
+
+        // 999000000000000000000 => 999.0 ether => provided 3 ether => share = 0.006 ether => should receive = 3.006 ether
+        // 999000000000000000000 => 999.0 ether => provided 6 ether => share = 0.012 ether => should receive = 6.012 ether 
+        // 999000000000000000000 => 999.0 ether => provided 9 ether => share = 0.018 ether => should receive = 9.018 ether
+        // 18000000000000000     => 0.018 ether      total 18 ether                   total before withdraw = 18.036 ether
+        // 36000000000000000     => 0.036 ether =>                                total 0.036 ether 
+        //share = (address(this).balance / shareSupply) * providerShares[msg.sender];
+
         //share balances updated in storage
         providerShares[msg.sender] = providerShares[msg.sender] - shareAmount;
         shareSupply = shareSupply - shareAmount;
+        //uint256 interestAmount = address(this).balance - shareSupply; 
+        //uint256 share = providerShare + shareAmount;
         //ether returned to user
         //msg.sender.transfer(shareValue);
-        (bool sent,) = msg.sender.call{value: shareAmount}("");
+        (bool sent,) = msg.sender.call{value: shareValue}("");
         require(sent, "Failed to send Ether");
 
-        emit LiquidityRemoved(msg.sender, shareAmount, shareAmount);
+        emit LiquidityRemoved(msg.sender, shareValue, shareAmount);
     }
 
     //issue a new loan
     function borrow(uint256 ethAmount) external borrowLock {
         require(ethAmount >= 1 wei, "non-dust value required");
         require(ethAmount <= address(this).balance, "insufficient global liquidity");
-        //@dev this should really be unreachable given the modifier
         require(borrowerDebt[msg.sender] == 0, "active loan in progress");
-        //current balance recored and debt calculated
+
         uint256 initialLiquidity = address(this).balance;
         uint256 interest = calculateInterest(ethAmount);
         uint256 protocolInterest = calculateProtocolInterest(ethAmount);
         uint256 outstandingDebt = ethAmount + interest;
-        //global mutex activated, pausing all functions except repayDebt()
+
         borrowLocked = true;
-        //debt recoreded in storage (but gas will be partially refunded when it's zeroed out)
         borrowerDebt[msg.sender] = outstandingDebt;
-        //requested funds sent to user via raw call with empty data
-        //additional gas withheld to ensure the completion of this function
-        //data is ignored
+
         (bool result0,) = msg.sender.call{gas: (gasleft() - 10000), value: ethAmount}("");
-        //borrower can now execute actions triggered by a fallback function in their contract
-        //they need to call repayDebt() and return the funds before this function continues
         require(result0, "the call must return true");
-        //will revert full tx if loan is not repaid
+
         require(
             address(this).balance >= (initialLiquidity + interest),
             "funds must be returned plus interest"
         );
-        // prevents mutex being locked via ether forced into contract rather than via repayDebt()
         require(borrowerDebt[msg.sender] == 0, "borrower debt must be repaid in full");
+
         (bool result1,) = protocol.call{gas: (gasleft() - 10000), value: protocolInterest}("");
-        //borrower can now execute actions triggered by a fallback function in their contract
-        //they need to call repayDebt() and return the funds before this function continues
         require(result1, "the call must return true");
-        //mutex disabled
+
         borrowLocked = false;
 
         emit LoanCompleted(msg.sender, outstandingDebt);
@@ -118,6 +118,14 @@ contract Arblet is Ownable {
         emit LoanRepayed(borrower, msg.sender, outstandingDebt);
     }
 
+    function setProtocol(address protocol_) public onlyOwner borrowLock {
+        protocol = protocol_;
+    }
+
+    function setFee(uint256 protocolFee_, uint256 providerFee_) public onlyOwner borrowLock {
+        protocolFee = protocolFee_;
+        fee = protocolFee_ + providerFee_;
+    }
     /**
      * VIEW FUNCTIONS
      */
@@ -141,11 +149,11 @@ contract Arblet is Ownable {
         value = (interestValue * 10 ** 18) / shareProportion;
     }
 
-    function calculateInterest(uint256 loanAmount) public pure returns (uint256 interest) {
+    function calculateInterest(uint256 loanAmount) public view returns (uint256 interest) {
         interest = (loanAmount * fee) / 10 ** 18;
     }
 
-    function calculateProtocolInterest(uint256 loanAmount) public pure returns (uint256 protocolInterest) {
+    function calculateProtocolInterest(uint256 loanAmount) public view returns (uint256 protocolInterest) {
         protocolInterest = (loanAmount * protocolFee) / 10 ** 18;
     }
 
@@ -153,9 +161,6 @@ contract Arblet is Ownable {
         avialableLiquidity = address(this).balance;
     }
 
-    function setProtocol(address protocol_) public onlyOwner {
-        protocol = protocol_;
-    }
 
     function getShares(address provider) public view returns (uint256) {
         return (providerShares[provider]);
