@@ -5,7 +5,6 @@ interface IArblet {
     function borrow(uint256 _ethAmount) external;
     function repayDebt(address _borrower) external payable;
     function calculateInterest(uint256 loanAmount) external returns (uint256 interest);
-    function calculateProtocolInterest(uint256 loanAmount) external returns (uint256 protocolInterest);
 }
 
 contract Searcher {
