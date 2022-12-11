@@ -27,7 +27,6 @@ contract Arblet is Ownable {
 
     event LoanRepayed(address indexed borrower, address indexed payee, uint256 debtRepayed);
 
-    // Function to receive Ether. msg.data must be empty
     receive() external payable {}
 
     // Auto repay debt from msg.sender
@@ -36,7 +35,6 @@ contract Arblet is Ownable {
         repayDebt(msg.sender);
     }
 
-    // Add ether liquidity and receive newly minted shares
     function provideLiquidity() external payable borrowLock {
         require(msg.value > 1 wei, "Non-dust value required");
         uint256 sharesMinted = msg.value;
@@ -46,7 +44,6 @@ contract Arblet is Ownable {
         emit LiquidityAdded(msg.sender, msg.value, sharesMinted);
     }
 
-    //withdraw a portion of liquidity by burning shares owned
     function withdrawLiquidity(uint256 shareAmount) external borrowLock{
         require(shareAmount > 0, "non-zero value required");
         require(shareAmount <= providerShares[msg.sender], "insufficient user balance");
@@ -55,20 +52,9 @@ contract Arblet is Ownable {
         uint256 sharePer = (address(this).balance * 10**18 / shareSupply);
         uint256 shareValue = (sharePer * (shareAmount)) / 10**18;
 
-        // 999000000000000000000 => 999.0 ether => provided 3 ether => share = 0.006 ether => should receive = 3.006 ether
-        // 999000000000000000000 => 999.0 ether => provided 6 ether => share = 0.012 ether => should receive = 6.012 ether 
-        // 999000000000000000000 => 999.0 ether => provided 9 ether => share = 0.018 ether => should receive = 9.018 ether
-        // 18000000000000000     => 0.018 ether      total 18 ether                   total before withdraw = 18.036 ether
-        // 36000000000000000     => 0.036 ether =>                                total 0.036 ether 
-        //share = (address(this).balance / shareSupply) * providerShares[msg.sender];
-
-        //share balances updated in storage
         providerShares[msg.sender] = providerShares[msg.sender] - shareAmount;
         shareSupply = shareSupply - shareAmount;
-        //uint256 interestAmount = address(this).balance - shareSupply; 
-        //uint256 share = providerShare + shareAmount;
-        //ether returned to user
-        //msg.sender.transfer(shareValue);
+
         (bool sent,) = msg.sender.call{value: shareValue}("");
         require(sent, "Failed to send Ether");
 
@@ -106,7 +92,6 @@ contract Arblet is Ownable {
         emit LoanCompleted(msg.sender, outstandingDebt);
     }
 
-    //debt can be repaid from another address than the original borrower
     function repayDebt(address borrower) public payable {
         require(borrowLocked == true, "can only repay active loans");
         require(borrowerDebt[borrower] != 0, "must repay outstanding debt");
