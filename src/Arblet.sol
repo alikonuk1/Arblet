@@ -10,7 +10,6 @@ contract Arblet is Ownable {
     uint256 public shareSupply;
     address public protocol;
 
-
     mapping(address => uint256) public providerShares;
     mapping(address => uint256) public borrowerDebt;
 
@@ -44,13 +43,13 @@ contract Arblet is Ownable {
         emit LiquidityAdded(msg.sender, msg.value, sharesMinted);
     }
 
-    function withdrawLiquidity(uint256 shareAmount) external borrowLock{
+    function withdrawLiquidity(uint256 shareAmount) external borrowLock {
         require(shareAmount > 0, "non-zero value required");
         require(shareAmount <= providerShares[msg.sender], "insufficient user balance");
         require(shareAmount <= shareSupply, "insufficient global supply");
 
-        uint256 sharePer = (address(this).balance * 10**18 / shareSupply);
-        uint256 shareValue = (sharePer * (shareAmount)) / 10**18;
+        uint256 sharePer = (address(this).balance * 10 ** 18 / shareSupply);
+        uint256 shareValue = (sharePer * (shareAmount)) / 10 ** 18;
 
         providerShares[msg.sender] = providerShares[msg.sender] - shareAmount;
         shareSupply = shareSupply - shareAmount;
@@ -78,10 +77,7 @@ contract Arblet is Ownable {
         (bool result0,) = msg.sender.call{gas: (gasleft() - 10000), value: ethAmount}("");
         require(result0, "the call must return true");
 
-        require(
-            address(this).balance >= (initialLiquidity + interest),
-            "funds must be returned plus interest"
-        );
+        require(address(this).balance >= (initialLiquidity + interest), "funds must be returned plus interest");
         require(borrowerDebt[msg.sender] == 0, "borrower debt must be repaid in full");
 
         (bool result1,) = protocol.call{gas: (gasleft() - 10000), value: protocolInterest}("");
@@ -116,16 +112,16 @@ contract Arblet is Ownable {
      */
 
     // 1000000000000000000 = 100
-    // 
+    //
     // 10000000000000000 = 1
-    // 
+    //
     // 1000000000000000 = 0.1
-    function liquidityAsPercentage(uint256 addedLiquidity) public view returns(uint256 liquidityPercentage){
-        if(address(this).balance <= 0){
+    function liquidityAsPercentage(uint256 addedLiquidity) public view returns (uint256 liquidityPercentage) {
+        if (address(this).balance <= 0) {
             liquidityPercentage = 10 ** 18;
         } else {
-        uint256 liquidity = addedLiquidity + address(this).balance;
-        liquidityPercentage = (addedLiquidity * 10 ** 18 / liquidity);
+            uint256 liquidity = addedLiquidity + address(this).balance;
+            liquidityPercentage = (addedLiquidity * 10 ** 18 / liquidity);
         }
     }
 
@@ -145,7 +141,6 @@ contract Arblet is Ownable {
     function currentLiquidity() external view returns (uint256 avialableLiquidity) {
         avialableLiquidity = address(this).balance;
     }
-
 
     function getShares(address provider) public view returns (uint256) {
         return (providerShares[provider]);

@@ -6,7 +6,7 @@ import {Arblet} from "../src/Arblet.sol";
 
 import {Searcher} from "./mock/Searcher.sol";
 
-contract ArbletTest is Test{
+contract ArbletTest is Test {
     Arblet arb;
     Searcher searcher;
 
@@ -211,11 +211,6 @@ contract ArbletTest is Test{
         arb.withdrawLiquidity(shares1);
         vm.stopPrank();
 
-/*         uint256 expectedInterest = 3 ether + ((3 ether * 2 * 10 ** 15) / 10 ** 18);
-        uint256 actualInterest = address(provider1).balance - 999 ether;
-
-        assertEq(expectedInterest, actualInterest); */
-
         emit log_string("c");
         emit log_uint(address(arb).balance);
 
@@ -242,5 +237,30 @@ contract ArbletTest is Test{
         emit log_uint(address(protocol).balance);
         emit log_string("c");
         emit log_uint(address(arb).balance);
+    }
+
+    function testSuccess_setFees() public {
+        assertEq(arb.fee(), 3 * 10 ** 15);
+        assertEq(arb.protocolFee(), 1 * 10 ** 15);
+
+        vm.startPrank(creator);
+        arb.setFee(3 * 10 ** 15, 6 * 10 ** 15);
+        vm.stopPrank();
+
+        assertEq(arb.fee(), 9 * 10 ** 15);
+        assertEq(arb.protocolFee(), 3 * 10 ** 15);
+    }
+
+    function testRevert_setFees_nonOwner() public {
+        assertEq(arb.fee(), 3 * 10 ** 15);
+        assertEq(arb.protocolFee(), 1 * 10 ** 15);
+
+        vm.startPrank(hacker);
+        vm.expectRevert("Ownable: caller is not the owner");
+        arb.setFee(3 * 10 ** 15, 6 * 10 ** 15);
+        vm.stopPrank();
+
+        assertEq(arb.fee(), 3 * 10 ** 15);
+        assertEq(arb.protocolFee(), 1 * 10 ** 15);
     }
 }
