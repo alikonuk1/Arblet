@@ -1,5 +1,10 @@
 # Arblet
 
+Please get in contact if you find any bugs :)
+[@alikonukk1](https://twitter.com/alikonukk1)
+alikonuk1@protonmail.com
+
+
 ## Deployed Contracts
 
 - `Ethereum` - [To be deployed..](https://etherscan.io)
