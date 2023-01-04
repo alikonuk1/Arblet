@@ -35,7 +35,7 @@ contract Arblet is Ownable {
     }
 
     function provideLiquidity() external payable borrowLock {
-        require(msg.value > 1 wei, "Non-dust value required");
+        require(msg.value > 0.1 ether, "Non-dust value required");
         uint256 sharesMinted = msg.value;
         providerShares[msg.sender] = providerShares[msg.sender] + sharesMinted;
         shareSupply = shareSupply + sharesMinted;
