@@ -5,6 +5,7 @@ import {Ownable} from "./utils/Ownable.sol";
 
 contract Arblet is Ownable {
     bool public borrowLocked;
+    bool public lock;
     uint256 public fee = 3 * 10 ** 15; // 3000000000000000 = 0.3%
     uint256 public protocolFee = 1 * 10 ** 15; // 1000000000000000 = 0.1%
     uint256 public shareSupply;
@@ -16,6 +17,13 @@ contract Arblet is Ownable {
     modifier borrowLock() {
         require(!borrowLocked, "Functions locked during a loan");
         _;
+    }
+
+    modifier noReentrancy() {
+        require(!lock, "Reentrancy detected");
+        lock = true;
+        _;
+        lock = false;
     }
 
     event LiquidityAdded(address indexed provider, uint256 ethAdded, uint256 sharesMinted);
@@ -34,22 +42,26 @@ contract Arblet is Ownable {
         repayDebt(msg.sender);
     }
 
-    function provideLiquidity() external payable borrowLock {
+    function provideLiquidity() external payable borrowLock noReentrancy {
         require(msg.value > 0.1 ether, "Non-dust value required");
         uint256 sharesMinted = msg.value;
+        require(shareSupply + sharesMinted >= shareSupply, "Integer overflow detected");
+
         providerShares[msg.sender] = providerShares[msg.sender] + sharesMinted;
         shareSupply = shareSupply + sharesMinted;
 
         emit LiquidityAdded(msg.sender, msg.value, sharesMinted);
     }
 
-    function withdrawLiquidity(uint256 shareAmount) external borrowLock {
+    function withdrawLiquidity(uint256 shareAmount) external borrowLock noReentrancy {
         require(shareAmount > 0, "non-zero value required");
         require(shareAmount <= providerShares[msg.sender], "insufficient user balance");
         require(shareAmount <= shareSupply, "insufficient global supply");
 
         uint256 sharePer = (address(this).balance * 10 ** 18 / shareSupply);
         uint256 shareValue = (sharePer * (shareAmount)) / 10 ** 18;
+
+        require(address(this).balance >= shareValue, "insufficient contract balance");
 
         providerShares[msg.sender] = providerShares[msg.sender] - shareAmount;
         shareSupply = shareSupply - shareAmount;
@@ -61,8 +73,8 @@ contract Arblet is Ownable {
     }
 
     //issue a new loan
-    function borrow(uint256 ethAmount) external borrowLock {
-        require(ethAmount >= 1 wei, "non-dust value required");
+    function borrow(uint256 ethAmount) external borrowLock noReentrancy {
+        require(ethAmount >= 0.1 ether, "non-dust value required");
         require(ethAmount <= address(this).balance, "insufficient global liquidity");
         require(borrowerDebt[msg.sender] == 0, "active loan in progress");
 
