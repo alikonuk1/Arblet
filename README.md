@@ -4,7 +4,7 @@
 ## Deployed Contracts
 
 - `Ethereum` - [To be deployed..](https://etherscan.io)
-- `Goerli` - [0x0BD983fa39243fF19957C9AfE35c01575E93e2bD](https://goerli.etherscan.io/address/0x0BD983fa39243fF19957C9AfE35c01575E93e2bD#code)
+- `Goerli` - [0x1b11e14c93505e849f54c9a778bba16b293a342b](https://goerli.etherscan.io/address/0x1b11e14c93505e849f54c9a778bba16b293a342b#code)
 
 Please get in contact if you find any bugs :)
 - [@alikonukk1](https://twitter.com/alikonukk1)
